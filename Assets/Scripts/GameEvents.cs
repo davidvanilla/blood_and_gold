@@ -15,6 +15,14 @@ public static class GameEvents
     public static event Action<GameObject> DestroyItem;
     public static event Action OnAmoCountChanged;
 
+
+    public static event Action OnZombieDied;
+   
+
+    public static void TriggerZombieDied()
+    {
+        OnZombieDied?.Invoke();
+    }
     public static void TriggerItemPickedUp()
     {
         OnItemPickedUp?.Invoke();

@@ -251,6 +251,7 @@ public class ShooterEnemy : MonoBehaviour, IDamageable
         _muzzleFlash.Stop();
         if (audioSource && deathSound) audioSource.PlayOneShot(deathSound);
 
+        GameEvents.TriggerZombieDied();
         // Ragdoll (optional)
         //Rigidbody[] rbs = GetComponentsInChildren<Rigidbody>();
         //foreach (Rigidbody rb in rbs) rb.isKinematic = false;

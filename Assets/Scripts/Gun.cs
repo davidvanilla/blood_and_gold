@@ -163,6 +163,7 @@ public class Gun : MonoBehaviour
             //_audioSource.Stop();
             _muzzleLight.enabled = false;
             _muzzleFlash.Stop();
+            _audioSource.Stop();
             _audioSource.PlayOneShot(_emptySound);
             return;
         }
@@ -177,10 +178,12 @@ public class Gun : MonoBehaviour
 
         if (_audioSource != null && !_audioSource.isPlaying)
         {
-            _audioSource.PlayOneShot(_shotSound);
+            _audioSource.clip = _shotSound;
+            _audioSource.Play();
+
         }
 
-        
+
         Ray camRay = new Ray(_virtualCamera.transform.position, _virtualCamera.transform.forward);
 
         int playerLayer = LayerMask.NameToLayer("Player");

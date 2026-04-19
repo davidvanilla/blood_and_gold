@@ -134,8 +134,29 @@ public class PlayerInteractions : MonoBehaviour
         {
             //newGunObj.transform.localPosition = new Vector3(-0.1f, 0.214f, 0.054f);
             //newGunObj.transform.localRotation = Quaternion.Euler(177.881f, 22.9259f, 80.247f);
-            newGunObj.transform.localPosition = new Vector3(-0.074f, 0.219f, 0.05f);
-            newGunObj.transform.localRotation = Quaternion.Euler(-1.652f, -169.048f, -101.102f);
+
+            switch (player.Name)
+            {
+                case "REMI":
+                    newGunObj.transform.localPosition = new Vector3(-0.103f, 0.526f, 0.093f);
+                    newGunObj.transform.localRotation = Quaternion.Euler(-199.459f, 8.0995f, 65.539f);
+                    Debug.Log("Using REMI gun AR15");
+                    //newGunObj.transform.localPosition = new Vector3(-0.163f, 0f, -0.038f);
+                    //newGunObj.transform.localRotation = Quaternion.Euler(-81.804f, -323.099f, 336.353f);
+                    break;
+
+                case "AMOS":
+                    
+                    break;
+
+                default:
+                    newGunObj.transform.localPosition = new Vector3(-0.074f, 0.219f, 0.05f);
+                    newGunObj.transform.localRotation = Quaternion.Euler(-1.652f, -169.048f, -101.102f);
+                    break;
+            }
+
+
+        
         }
         else if (riffleType == RiffleType.ARLP)
         {

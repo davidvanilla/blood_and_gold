@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 
 using Unity.Cinemachine;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
@@ -14,7 +15,8 @@ public class Player : MonoBehaviour
     private float _moveSpeed = 2f;
     private Animator _animator;
     [SerializeField] private float _rotationSpeed = 10f;
-    [SerializeField] private Transform _camera;
+    private Transform _camera;
+    [SerializeField] public String Name;
     private bool _isSprinting;
     [SerializeField] private float _walkSpeed = 2f;
     [SerializeField] private float _sprintSpeed = 10f;
@@ -22,7 +24,7 @@ public class Player : MonoBehaviour
     private bool _isVaulting;       
     [SerializeField] private float _vaultDuration = 1.5f;
     private bool _isAiming = false;
-    [SerializeField] private CinemachineCamera _virtualCamera;
+    private CinemachineCamera _virtualCamera;
     [SerializeField] private float _normalFOV = 24f;
     [SerializeField] private float _aimFOV = 10f;
     [SerializeField] private float _zoomSpeed = 10f;
@@ -83,21 +85,43 @@ public class Player : MonoBehaviour
     private int zombieHandLayer;
     private bool _isReloading;
     private Coroutine _reloadCoroutine;
+
+    private Rigidbody _rigidbody;
+    private Vector3 _desiredMoveDirection;
+    private float _desiredMoveSpeed;
+    private Quaternion _targetRotation;
+
     private void Awake()
     {
+        Debug.Log("Awake called");
         _playerControlls = new InputSystem_Actions();
-        
-
-        _animator = GetComponent<Animator>();
+        //_animator = GetComponent<Animator>();
+        _animator = GetComponentInChildren<Animator>();
         capsuleCollider = GetComponent<CapsuleCollider>();
 
-        if (_virtualCamera != null)
+
+        if (_camera == null)
         {
-            // Get the orbital follow component from the camera
-            _orbitalFollow = _virtualCamera.GetComponent<CinemachineOrbitalFollow>();
+            // Try to find the main camera (or any camera tagged "MainCamera")
+            Camera mainCam = Camera.main;
+            if (mainCam != null)
+                _camera = mainCam.transform;
+            else
+                Debug.LogError("No camera found! Make sure your camera is tagged 'MainCamera'.");
+        }
+        if (_virtualCamera == null)
+        {
+            // Find the Cinemachine camera in the scene
+            _virtualCamera = FindFirstObjectByType<CinemachineCamera>();
+            if (_virtualCamera == null)
+                Debug.LogError("No CinemachineCamera found in scene!");
         }
 
         _crosshairImage.enabled = false; // Hide crosshair by default
+
+        _rigidbody = GetComponent<Rigidbody>();
+        // Optional: prevent physics from rotating the player
+        _rigidbody.freezeRotation = true;
     }
 
     private void Start()
@@ -106,8 +130,10 @@ public class Player : MonoBehaviour
         Application.targetFrameRate = Screen.currentResolution.refreshRate;
         UpdateHealth?.Invoke();
         bloodMark.enabled = false;
+        Debug.Log($" blood mark {bloodMark.IsActive()}");
         hitReaction = GetComponent<HitReaction>();
         zombieHandLayer = LayerMask.NameToLayer("ZombieHand");
+        _targetRotation = transform.rotation;
     }
 
     private void OnEnable()
@@ -310,12 +336,12 @@ public class Player : MonoBehaviour
     public void TakeZombieDamage()
     {
         // Existing code
-        _animator.SetTrigger("Hit");
+        //_animator.SetTrigger("Hit");
         currentHealth -= 10;
         Debug.Log($"current player health {currentHealth}");
 
         // Show blood effect on screen
-        if(currentHealth < 60)
+        if(currentHealth < 90)
         {
             if (bloodOverlay != null)
             {
@@ -336,6 +362,10 @@ public class Player : MonoBehaviour
 
         GameEvents.TriggerHealthChanged();
     }
+
+
+    
+
 
     public void TakeGunDamage()
     {
@@ -510,8 +540,8 @@ public class Player : MonoBehaviour
 
     private void Update()
     {
-        // show blood effect for low health
-        if (currentHealth < 20 && lowHealthFlashCoroutine == null && isDead==true)
+        // ---- Low health blood effect ----
+        if (currentHealth < 20 && lowHealthFlashCoroutine == null && isDead == true)
         {
             lowHealthFlashCoroutine = StartCoroutine(FlashBloodEffect());
         }
@@ -524,12 +554,11 @@ public class Player : MonoBehaviour
             bloodOverlay.color = c;
         }
 
-
+        // ---- Ground check ----
         Vector3 bottom = transform.position + Vector3.down * (capsuleCollider.height / 2f - capsuleCollider.radius);
         isGrounded = Physics.CheckSphere(bottom, _groundCheckRadius, _groundLayer);
-        //Debug.Log($"Is Grounded: {isGrounded}");
 
-        // allow zooming when aiming 
+        // ---- Camera zoom when aiming ----
         if (_orbitalFollow != null)
         {
             float targetRadius = _isAiming ? _aimRadius : _normalRadius;
@@ -540,49 +569,31 @@ public class Player : MonoBehaviour
             );
         }
 
-        //Debug.Log($"is aiming {_isAiming}");
-        //_animator.SetBool("Aim", true);
-        //if (_isVaulting)
-        //    return;
-
+        // ---- Movement direction calculation (camera-relative) ----
         Vector3 camForward = _camera.forward;
         Vector3 camRight = _camera.right;
-
         camForward.y = 0;
         camRight.y = 0;
-
         camForward.Normalize();
         camRight.Normalize();
 
         _moveSpeed = _isSprinting ? _sprintSpeed : _walkSpeed;
+        _desiredMoveDirection = camForward * _moveInput.y + camRight * _moveInput.x;
+        _desiredMoveSpeed = _moveSpeed;
 
-        // Camera-relative movement direction
-        Vector3 moveDirection = camForward * _moveInput.y + camRight * _moveInput.x;
-
-        // Move player
-        transform.Translate(moveDirection * _moveSpeed * Time.deltaTime, Space.World);
-
-
-
-        // Animation
+        // ---- Animation parameters ----
         float speed = _moveInput.magnitude;
         _animator.SetFloat("Walk", speed);
         if (_isSprinting && !_isAiming)
         {
             _animator.SetBool("Sprint", true);
-            
         }
         else
         {
             _animator.SetBool("Sprint", false);
-        
         }
 
-
-
-
-
-
+        // ---- Calculate target rotation (but DO NOT apply it here) ----
         if (_isAiming)
         {
             // While aiming, face the horizontal direction of the camera
@@ -590,23 +601,38 @@ public class Player : MonoBehaviour
             cameraForward.y = 0;
             if (cameraForward.sqrMagnitude > 0.01f)
             {
-                Quaternion targetRotation = Quaternion.LookRotation(cameraForward);
-                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, _rotationSpeed * Time.deltaTime);
+                _targetRotation = Quaternion.LookRotation(cameraForward);
             }
         }
         else
         {
             // Not aiming: face movement direction if moving
-            if (moveDirection.sqrMagnitude > 0.01f)
+            if (_desiredMoveDirection.sqrMagnitude > 0.01f)
             {
-                Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
-                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, _rotationSpeed * Time.deltaTime);
+                _targetRotation = Quaternion.LookRotation(_desiredMoveDirection);
             }
         }
+    }
 
-       // Debug.DrawLine(_camera.position, _aimPoint, Color.red);
-      
+    private void FixedUpdate()
+    {
+        // ---- Apply rotation using physics (synchronized with movement) ----
+        if (_targetRotation != null) // Quaternion is a struct, but we can check if it's not default
+        {
+            // Smoothly rotate toward the target rotation using physics interpolation
+            _rigidbody.MoveRotation(Quaternion.Slerp(
+                _rigidbody.rotation,
+                _targetRotation,
+                _rotationSpeed * Time.fixedDeltaTime
+            ));
+        }
 
+        // ---- Apply movement using physics ----
+        if (_desiredMoveDirection.sqrMagnitude > 0.01f)
+        {
+            Vector3 newPosition = _rigidbody.position + _desiredMoveDirection * _desiredMoveSpeed * Time.fixedDeltaTime;
+            _rigidbody.MovePosition(newPosition);
+        }
     }
 
 

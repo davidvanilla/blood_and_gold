@@ -190,6 +190,7 @@ public class Enemy : MonoBehaviour, IDamageable
 
     public void TakeDamage(int damage, bool ih)
     {
+        if (isDead) return;
         isHead = ih;
         currentHealth -= damage;
         if (currentHealth <= 0)
@@ -233,8 +234,12 @@ public class Enemy : MonoBehaviour, IDamageable
 
     private void Die1()
     {
+        if (isDead)
+        {
+            return;
+        }
 
-        Debug.Log($"is head hit? {isHead}");
+        //Debug.Log($"is head hit? {isHead}");
         Collider[] colliders = GetComponentsInChildren<Collider>();
         foreach (Collider col in colliders)
         {
@@ -255,5 +260,9 @@ public class Enemy : MonoBehaviour, IDamageable
 
         agent.isStopped = true;
         isDead = true;
+
+
+
+        GameEvents.TriggerZombieDied();
     }
 }
